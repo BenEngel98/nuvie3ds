@@ -40,6 +40,17 @@ bool n3ds_text_wanted();
 // screen (Nuvie's software frame, before it goes to the renderer).
 void n3ds_set_mirror_surface(SDL_Surface* s);
 
+// The "touch view": the bottom screen shows the game (shrunk) so a target
+// can be tapped; it opens when a command is tapped on the keyboard or MAP
+// is pressed, and the platform layer closes it when the command is over.
+bool   n3ds_kbd_touch_view();
+Uint64 n3ds_kbd_touch_view_since();
+void   n3ds_kbd_set_touch_view(bool on);
+
+// Forward a touch on the touch view to the game window as a mouse click at
+// game-window coordinates: phase 0 = down, 1 = move, 2 = up (n3ds_platform).
+void n3ds_forward_touch(float x, float y, int phase);
+
 // The window that game input should be delivered to (set by Image_window).
 void        n3ds_set_game_window(SDL_Window* w);
 SDL_Window* n3ds_get_game_window();

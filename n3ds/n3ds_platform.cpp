@@ -32,6 +32,8 @@
 #include "Screen.h"
 #include "Game.h"
 #include "ViewManager.h"
+#include "Event.h"
+#include "Converse.h"
 #include "TileManager.h"
 #include "InventoryView.h"
 
@@ -479,6 +481,22 @@ void n3ds_input_start(SDL_Window* win) {
 	std::printf("Nuvie 3DS: input ready, %d gamepad(s), window %dx%d\n", count, w, h);
 }
 
+void n3ds_forward_touch(float x, float y, int phase) {
+	int ww = 400, wh = 240;
+	if (SDL_Window* w = game_window()) {
+		SDL_GetWindowSize(w, &ww, &wh);
+	}
+	cur_x = std::min(std::max(x, 0.f), static_cast<float>(ww - 1));
+	cur_y = std::min(std::max(y, 0.f), static_cast<float>(wh - 1));
+	const Uint64 ts = SDL_GetTicksNS();
+	push_mouse_motion(ts);
+	if (phase == 0) {
+		push_mouse_button(SDL_BUTTON_LEFT, true, ts);
+	} else if (phase == 2) {
+		push_mouse_button(SDL_BUTTON_LEFT, false, ts);
+	}
+}
+
 Uint32 n3ds_mouse_state(float* x, float* y) {
 	if (x) {
 		*x = seen_x;
@@ -510,6 +528,17 @@ void n3ds_apply_screen() {
 void n3ds_frame() {
 	if (n3ds_take_screen_swap_request()) {
 		n3ds_apply_screen();
+	}
+	// Close the touch view once the command it was opened for is finished
+	// (back in the normal walking-around mode), after a moment's grace so
+	// the key press has been processed first.
+	if (n3ds_kbd_touch_view() && SDL_GetTicks() - n3ds_kbd_touch_view_since() > 700) {
+		Game*  game = Game::get_game();
+		Event* ev   = game ? game->get_event() : nullptr;
+		// A conversation needs the keyboard back right away.
+		if (ev && ((ev->get_mode() == MOVE_MODE && !game->user_paused()) || (game->get_converse() && game->get_converse()->running()))) {
+			n3ds_kbd_set_touch_view(false);
+		}
 	}
 	const Uint64 now = SDL_GetTicks();
 	if (now - last_debug > 30000) {

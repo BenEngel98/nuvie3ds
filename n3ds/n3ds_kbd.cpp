@@ -99,6 +99,7 @@ namespace {
 		SDL_Keycode key;
 		char        text;    // character typed (0 = none)
 		bool        is_shift;
+		int         special;    // 0 = plain key, 1 = game command, 2 = MAP (touch view)
 	};
 
 	constexpr int KW  = 28;    // key width
@@ -134,7 +135,7 @@ namespace {
 			} else if (*p == '?') {
 				k = SDLK_SLASH;
 			}
-			keys.push_back({x, Y0 + row * (KH + GAP), KW, KH, l, k, *p, false});
+			keys.push_back({x, Y0 + row * (KH + GAP), KW, KH, l, k, *p, false, 0});
 			x += KW + GAP;
 		}
 	}
@@ -154,20 +155,21 @@ namespace {
 			const int cw = 29;
 			const int cg = 2;
 			for (int i = 0; i < 10; i++) {
-				keys.push_back({X0 + i * (cw + cg), 4, cw, CH, cmds[i].label, cmds[i].key, 0, false});
+				keys.push_back({X0 + i * (cw + cg), 4, cw, CH, cmds[i].label, cmds[i].key, 0, false, 1});
 			}
 		}
 		add_row(0, "1234567890");
 		add_row(1, "QWERTYUIOP");
 		add_row(2, "ASDFGHJKL'");
 		add_row(3, "ZXCVBNM,.?");
-		// Bottom row: ESC | SHIFT | SPACE | BKSP | ENTER
+		// Bottom row: ESC | SHIFT | SPACE | BKSP | ENTER | MAP
 		const int y = Y0 + 4 * (KH + GAP);
-		keys.push_back({X0, y, 44, KH, "ESC", SDLK_ESCAPE, 0, false});
-		keys.push_back({X0 + 48, y, 44, KH, "^", SDLK_LSHIFT, 0, true});
-		keys.push_back({X0 + 96, y, 108, KH, "SPACE", SDLK_SPACE, ' ', false});
-		keys.push_back({X0 + 208, y, 44, KH, "<", SDLK_BACKSPACE, 0, false});
-		keys.push_back({X0 + 256, y, 56, KH, "ENTER", SDLK_RETURN, 0, false});
+		keys.push_back({X0, y, 40, KH, "ESC", SDLK_ESCAPE, 0, false, 0});
+		keys.push_back({X0 + 44, y, 36, KH, "^", SDLK_LSHIFT, 0, true, 0});
+		keys.push_back({X0 + 84, y, 72, KH, "SPACE", SDLK_SPACE, ' ', false, 0});
+		keys.push_back({X0 + 160, y, 40, KH, "<", SDLK_BACKSPACE, 0, false, 0});
+		keys.push_back({X0 + 204, y, 56, KH, "ENTER", SDLK_RETURN, 0, false, 0});
+		keys.push_back({X0 + 264, y, 48, KH, "MAP", SDLK_UNKNOWN, 0, false, 2});
 	}
 
 	// ---------------------------------------------------------------------
@@ -183,6 +185,13 @@ namespace {
 	bool         on_bottom     = false;
 	bool         swap_request  = false;
 	bool         aux_is_mirror = false;    // true: the aux window (top screen) mirrors the game
+	bool         touch_view    = false;    // bottom screen shows the game to tap on, instead of the keyboard
+	bool         touch_view_sticky = false;    // opened with MAP: stays until KEYBOARD is tapped
+	Uint64       touch_view_since = 0;
+	bool         touch_down    = false;
+	// The touch view: the game frame shrunk to 320x192 at the top, buttons below.
+	constexpr int TV_H = 192;
+	constexpr float TV_SCALE = 0.8f;
 	bool         text_wanted   = false;
 	SDL_Surface* mirror_src    = nullptr;
 
@@ -234,11 +243,23 @@ namespace {
 		ev.key.windowID  = game_window ? SDL_GetWindowID(game_window) : 0;
 		ev.key.key       = k.key;
 		ev.key.scancode  = SDL_GetScancodeFromKey(k.key, nullptr);
-		ev.key.mod       = shifted ? SDL_KMOD_SHIFT : SDL_KMOD_NONE;
+		ev.key.mod       = (shifted && k.special == 0) ? SDL_KMOD_SHIFT : SDL_KMOD_NONE;
 		ev.key.down      = down;
 		ev.key.repeat    = false;
 		SDL_PushEvent(&ev);
+		if (down && k.special == 1) {
+			// A game command: show the game on the touch screen so the target
+			// can be tapped, like tapping an icon on the command bar.
+			touch_view        = true;
+			touch_view_sticky = false;
+			touch_view_since  = SDL_GetTicks();
+			dirty             = true;
+		}
 
+		if (!down && shifted && k.special == 0 && !k.is_shift) {
+			shifted = false;    // shift applies to one key, like a phone keyboard
+			dirty   = true;
+		}
 		if (down && k.text && game_window && text_wanted) {
 			// Typing into a text field (character name, save name...).
 			static char bufs[16][2];
@@ -275,6 +296,38 @@ namespace {
 		}
 	}
 
+	// The touch view: the game frame shrunk onto the touch screen, with a
+	// KEYBOARD button and a CANCEL button underneath.
+	void draw_touch_view(SDL_Surface* s) {
+		fill_rect(s, 0, 0, s->w, s->h, 24, 22, 34);
+		if (mirror_src) {
+			SDL_Rect dst = {0, 0, static_cast<int>(mirror_src->w * TV_SCALE), static_cast<int>(mirror_src->h * TV_SCALE)};
+			dst.x        = (s->w - dst.w) / 2;
+			SDL_BlitSurfaceScaled(mirror_src, nullptr, s, &dst, SDL_SCALEMODE_NEAREST);
+		}
+		const int by = TV_H + 8;
+		const int bh = s->h - TV_H - 16;
+		fill_rect(s, 4, by, 150, bh, 110, 108, 128);
+		fill_rect(s, 5, by + 1, 148, bh - 2, 72, 70, 88);
+		draw_text(s, 4 + (150 - text_width("KEYBOARD", 2)) / 2, by + (bh - 14) / 2, "KEYBOARD", 2, 235, 235, 245);
+		fill_rect(s, 166, by, 150, bh, 110, 108, 128);
+		fill_rect(s, 167, by + 1, 148, bh - 2, 72, 70, 88);
+		draw_text(s, 166 + (150 - text_width("CANCEL", 2)) / 2, by + (bh - 14) / 2, "CANCEL", 2, 235, 235, 245);
+	}
+
+	void push_plain_key(SDL_Keycode key, bool down) {
+		SDL_Event ev;
+		SDL_zero(ev);
+		ev.type          = down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+		ev.key.timestamp = SDL_GetTicksNS();
+		ev.key.windowID  = game_window ? SDL_GetWindowID(game_window) : 0;
+		ev.key.key       = key;
+		ev.key.scancode  = SDL_GetScancodeFromKey(key, nullptr);
+		ev.key.mod       = SDL_KMOD_NONE;
+		ev.key.down      = down;
+		SDL_PushEvent(&ev);
+	}
+
 	// Copy the game's latest frame to the middle of the top screen, 1:1.
 	void draw_mirror(SDL_Surface* s) {
 		SDL_Surface* gs = mirror_src;
@@ -302,6 +355,22 @@ void n3ds_set_game_window(SDL_Window* w) {
 
 void n3ds_set_mirror_surface(SDL_Surface* s) {
 	mirror_src = s;
+}
+
+bool n3ds_kbd_touch_view() {
+	return touch_view && !touch_view_sticky;
+}
+
+Uint64 n3ds_kbd_touch_view_since() {
+	return touch_view_since;
+}
+
+void n3ds_kbd_set_touch_view(bool on) {
+	if (touch_view != on) {
+		touch_view = on;
+		touch_down = false;
+		dirty      = true;
+	}
 }
 
 SDL_Window* n3ds_get_game_window() {
@@ -378,6 +447,7 @@ void n3ds_kbd_destroy() {
 	}
 	aux_id      = 0;
 	pressed_key = -1;
+	touch_down  = false;
 }
 
 void n3ds_kbd_present() {
@@ -391,6 +461,11 @@ void n3ds_kbd_present() {
 	if (aux_is_mirror) {
 		// Called right after each game present: copy the new frame up.
 		draw_mirror(s);
+		SDL_UpdateWindowSurface(aux_window);
+		return;
+	}
+	if (touch_view) {
+		draw_touch_view(s);
 		SDL_UpdateWindowSurface(aux_window);
 		return;
 	}
@@ -478,12 +553,45 @@ bool n3ds_kbd_handle_event(SDL_Event* event) {
 		}
 		const float px = event->tfinger.x * 320.f;
 		const float py = event->tfinger.y * 240.f;
+		if (touch_view) {
+			// Taps on the shrunk game frame become mouse clicks on the game
+			// window (which is 1:1 on the top screen); the strip below holds
+			// the two buttons.
+			const int   fw = mirror_src ? static_cast<int>(mirror_src->w * TV_SCALE) : 320;
+			const float ox = (320 - fw) / 2.f;
+			if (event->type == SDL_EVENT_FINGER_DOWN) {
+				if (py < TV_H) {
+					touch_down = true;
+					n3ds_forward_touch((px - ox) / TV_SCALE, py / TV_SCALE, 0);
+				} else if (px < 160) {
+					touch_view = false;
+					dirty      = true;
+				} else {
+					push_plain_key(SDLK_SPACE, true);    // cancel the command
+					push_plain_key(SDLK_SPACE, false);
+					touch_view = false;
+					dirty      = true;
+				}
+			} else if (event->type == SDL_EVENT_FINGER_MOTION) {
+				if (touch_down) {
+					n3ds_forward_touch((px - ox) / TV_SCALE, py / TV_SCALE, 1);
+				}
+			} else if (touch_down) {    // up / cancelled
+				touch_down = false;
+				n3ds_forward_touch((px - ox) / TV_SCALE, py / TV_SCALE, 2);
+			}
+			return true;
+		}
 		if (event->type == SDL_EVENT_FINGER_DOWN) {
 			const int i = key_at(px, py);
 			if (i >= 0) {
 				const Key& k = keys[i];
 				if (k.is_shift) {
 					shifted = !shifted;
+				} else if (k.special == 2) {
+					touch_view        = true;
+					touch_view_sticky = true;
+					touch_view_since  = SDL_GetTicks();
 				} else {
 					pressed_key = i;
 					push_key(k, true);
