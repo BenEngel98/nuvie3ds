@@ -74,6 +74,11 @@ protected:
 	 */
 	SDL_AudioSpec _obtainedRate;
 
+	/** SDL 3 feeds the device through a stream; we fill it from a callback. */
+	SDL_AudioStream *_stream;
+	uint8 *_mixBuf;
+	int _mixBufLen;
+
 	/** State of the audio system */
 	bool _audioSuspended;
 
@@ -96,7 +101,7 @@ protected:
 	 * The mixer callback entry point. Static functions can't be overrided
 	 * by subclasses, so it invokes the non-static function callbackHandler()
 	 */
-	static void sdlCallback(void *this_, uint8 *samples, int len);
+	static void SDLCALL sdlCallback(void *this_, SDL_AudioStream *stream, int additional_amount, int total_amount);
 };
 
 #endif

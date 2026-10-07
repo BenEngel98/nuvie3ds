@@ -278,7 +278,7 @@ GUI_status SaveDialog::KeyDown(SDL_Keysym key)
 		fake_event.button.x = x;
 		fake_event.button.y = y;
 		fake_event.type = fake_event.button.type = SDL_MOUSEBUTTONDOWN;
-		fake_event.button.state = SDL_RELEASED;
+		fake_event.button.down = false;
 		fake_event.button.button = SDL_BUTTON_LEFT;
 		GUI::get_gui()->HandleEvent(&fake_event);
 

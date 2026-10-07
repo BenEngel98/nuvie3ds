@@ -201,12 +201,12 @@ bool Event::update() {
 bool Event::handleSDL_KEYDOWN(const SDL_Event *event) {
   // when casting the magic class will handle keyboard events
   if (mode == KEYINPUT_MODE) {
-    SDL_Keycode sym = event->key.keysym.sym;
+    SDL_Keycode sym = event->key.key;
     ActionKeyType action_key_type = OTHER_KEY;
 
     if (!((magic->is_selecting_spell() && ((sym >= SDLK_a && sym <= SDLK_z) || sym == SDLK_BACKSPACE)) ||
         ((magic->is_waiting_for_location() || last_mode == USE_MODE) && sym >= SDLK_1 && sym <= SDLK_9))) {
-      ActionType a = keybinder->get_ActionType(event->key.keysym);
+      ActionType a = keybinder->get_ActionType(nuvie_keysym(event));
       action_key_type = keybinder->GetActionKeyType(a);
       switch (action_key_type) {
         default: if (keybinder->handle_always_available_keys(a)) return true;
@@ -229,7 +229,7 @@ bool Event::handleSDL_KEYDOWN(const SDL_Event *event) {
   // alt-code input
   if (mods & KMOD_ALT) {
     if (mode == MOVE_MODE)
-      switch (event->key.keysym.sym) {
+      switch (event->key.key) {
         case SDLK_KP_0:
         case SDLK_0: alt_code_str[alt_code_len++] = '0';
           break;
@@ -313,8 +313,8 @@ bool Event::handleEvent(const SDL_Event *event) {
     case SDL_MOUSEMOTION: break;
     case SDL_MOUSEBUTTONDOWN: break;
     case SDL_KEYUP:
-      if (event->key.keysym.sym == SDLK_RALT
-          || event->key.keysym.sym == SDLK_LALT) {
+      if (event->key.key == SDLK_RALT
+          || event->key.key == SDLK_LALT) {
         clear_alt_code();
       }
       break;

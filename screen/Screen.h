@@ -46,6 +46,10 @@ class Screen
  SDL_Window *sdlWindow;
  SDL_Renderer *sdlRenderer;
  SDL_Texture *sdlTexture;
+#ifdef __3DS__
+ static Screen *n3ds_instance;
+ Uint32 n3ds_texture_format = 0;
+#endif
  float window_scale_w = 1.0, window_scale_h = 1.0;
 #endif
  ScalerRegistry		scaler_reg;		// Scaler Registry
@@ -76,6 +80,14 @@ class Screen
    ~Screen();
 
    bool init();
+
+#ifdef __3DS__
+   static Screen *get_screen() { return n3ds_instance; }
+   SDL_Window *get_sdl_window() { return sdlWindow; }
+   // Re-create the window on the other screen.
+   void n3ds_move_window(bool bottom);
+   void n3ds_present();
+#endif
 
    bool is_fullscreen() { return fullscreen; }
    bool is_non_square_pixels() { return non_square_pixels; }

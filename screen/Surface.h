@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
 struct SDL_Surface;
-struct SDL_PixelFormat;
+struct SDL_PixelFormatDetails;
 class OpenGL;
 
 class RenderSurface {
@@ -79,7 +79,7 @@ public:
 	void create_zbuffer();
 
 	// Set the buffer format from SDL_PixelFormat
-	void set_format(const SDL_PixelFormat *format);
+	void set_format(const SDL_PixelFormatDetails *format);
 
 	// Set a custom 565 format
 	void set_format565(int rsft = 11, int gsft = 5, int bsft = 0);

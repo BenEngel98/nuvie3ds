@@ -454,7 +454,7 @@ KeyMap::iterator KeyBinder::get_sdlkey_index(SDL_Keysym keysym)
 
 bool KeyBinder::HandleEvent(const SDL_Event *ev)
 {
-	SDL_Keysym key = ev->key.keysym;
+	SDL_Keysym key = nuvie_keysym(ev);
 	KeyMap::iterator sdlkey_index;
 
 	if (ev->type != SDL_KEYDOWN)
@@ -464,8 +464,8 @@ bool KeyBinder::HandleEvent(const SDL_Event *ev)
 	if (sdlkey_index != bindings.end())
 		return DoAction((*sdlkey_index).second);
 
-	if (ev->key.keysym.sym != SDLK_LALT && ev->key.keysym.sym != SDLK_RALT
-	    && ev->key.keysym.sym != SDLK_LCTRL && ev->key.keysym.sym != SDLK_RCTRL)
+	if (ev->key.key != SDLK_LALT && ev->key.key != SDLK_RALT
+	    && ev->key.key != SDLK_LCTRL && ev->key.key != SDLK_RCTRL)
 	{
 		handle_wrong_key_pressed();
 	}
@@ -1048,27 +1048,27 @@ void KeyBinder::init_joystick(sint8 joy_num)
 		int joystick_index = (int)enable_joystick;
 		SDL_InitSubSystem(SDL_INIT_JOYSTICK);
 
-		if(SDL_NumJoysticks() > 0)
+		int num_joysticks = 0;
+		SDL_JoystickID *ids = SDL_GetJoysticks(&num_joysticks);
+		if(ids && num_joysticks > 0)
 		{
-			for(int i=0; i < SDL_NumJoysticks(); i++)
-				fprintf(stdout, "Joystick %i is %s.\n", i, SDL_JoystickNameForIndex(i));
-#if SDL_VERSION_ATLEAST(2,0,0)
-//can use SDL_GameControllerGetAttached(SDL_GameController* gamecontroller) when we implement SDL2
-			if(enable_joystick == 127) // autodetect - seems to always pick joystick 0 but there is some possiblity that SDL couldn't open it
+			for(int i=0; i < num_joysticks; i++)
+				fprintf(stdout, "Joystick %i is %s.\n", i, SDL_GetJoystickNameForID(ids[i]));
+			if(enable_joystick == 127) // autodetect
 			{
-				for(int i=0; joystick == NULL && i < SDL_NumJoysticks(); i++)
+				for(int i=0; joystick == NULL && i < num_joysticks; i++)
 				{
 					joystick_index = i;
-					joystick = SDL_JoystickOpen(i);
+					joystick = SDL_OpenJoystick(ids[i]);
 				}
 			}
-			else
-#endif
-				joystick = SDL_JoystickOpen(joystick_index);
+			else if(joystick_index < num_joysticks)
+				joystick = SDL_OpenJoystick(ids[joystick_index]);
 		}
+		SDL_free(ids);
 		if(joystick == NULL)
 		{
-			if(enable_joystick == 127 || SDL_NumJoysticks() == 0)
+			if(enable_joystick == 127 || num_joysticks == 0)
 				fprintf(stderr, "Couldn't find any joysticks.\n");
 			else
 				fprintf(stderr, "Joysticks number %d was not found.\n", joystick_index);
@@ -1076,9 +1076,9 @@ void KeyBinder::init_joystick(sint8 joy_num)
 		}
 		else
 		{
-			fprintf(stdout, "Using joystick #%u, \"%s\". It has %u axes, %u %s, and %u buttons.\n", joystick_index, SDL_JoystickNameForIndex(joystick_index),
+			fprintf(stdout, "Using joystick #%u, \"%s\". It has %u axes, %u %s, and %u buttons.\n", joystick_index, SDL_GetJoystickName(joystick),
 			        SDL_JoystickNumAxes(joystick), SDL_JoystickNumHats(joystick), SDL_JoystickNumHats(joystick) == 1? "hat" : "hats", SDL_JoystickNumButtons(joystick));
-			SDL_JoystickEventState(SDL_ENABLE);
+			SDL_SetJoystickEventsEnabled(true);
 		}
 	}
 }

@@ -78,7 +78,7 @@ void GUI_Dialog::loadBorderImages()
 void GUI_Dialog::SetDisplay(Screen *s)
 {
 	GUI_Widget::SetDisplay(s);
-	bg_color = SDL_MapRGB(surface->format, R, G, B);
+	bg_color = SDL_MapSurfaceRGB(surface, R, G, B);
 }
 
 /* Show the widget  */

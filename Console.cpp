@@ -126,7 +126,7 @@ void ConsolePause()
 	 bool waiting=true;
 	 for(;waiting;)
 	 {
-		 while(!SDL_PollEvent(&event))
+		 while(SDL_PollEvent(&event))
 		 {
 			 if(event.type == SDL_KEYDOWN || event.type == SDL_QUIT)
 			 {
@@ -134,6 +134,7 @@ void ConsolePause()
 			 	 break;
 			 }
 		 }
+		 SDL_Delay(10);
 	 }
 }
 

@@ -254,7 +254,7 @@ void Application::show_8to16_blur
 		    screen->w, screen->h, screen->pitch,
 		    (uint16 *) sdl_surf->pixels,
 			sdl_surf->pitch/
-				sdl_surf->format->BytesPerPixel,
+				SDL_BYTESPERPIXEL(sdl_surf->format),
 			manip);
 	}
 
@@ -269,7 +269,7 @@ void Application::show_8to555_blur
 		    screen->w, screen->h, screen->pitch,
 		    (uint16 *) sdl_surf->pixels,
 			sdl_surf->pitch/
-				sdl_surf->format->BytesPerPixel,
+				SDL_BYTESPERPIXEL(sdl_surf->format),
 			manip);
 	}
 
@@ -284,7 +284,7 @@ void Application::show_8to565_blur
 		    screen->w, screen->h, screen->pitch,
 		    (uint16 *) sdl_surf->pixels,
 			sdl_surf->pitch/
-				sdl_surf->format->BytesPerPixel,
+				SDL_BYTESPERPIXEL(sdl_surf->format),
 			manip);
 	}
 
@@ -300,7 +300,7 @@ void Application::show_8to32_blur
 		    screen->w, screen->h, screen->pitch,
 			(uint32 *) sdl_surf->pixels,
 			sdl_surf->pitch/
-				sdl_surf->format->BytesPerPixel,
+				SDL_BYTESPERPIXEL(sdl_surf->format),
 								manip);
 	}
 
@@ -324,7 +324,7 @@ void Application::show_8to32_blur
 		screen->w,					/* Dest height. */						\
 		screen->h,					/* Dest width. */						\
 		1,							/* Amount to increment for each y pixel */\
-		-(sdl_surf->pitch/sdl_surf->format->BytesPerPixel),/* Amount to increment for each x pixel */\
+		-(sdl_surf->pitch/SDL_BYTESPERPIXEL(sdl_surf->format)),/* Amount to increment for each x pixel */\
 		manip);						/* Manipulator methods. */
 // Flips horizontally
 #define RotatorFunc(DestType)												\
@@ -342,7 +342,7 @@ void Application::show_8to32_blur
 		screen->w,					/* Dest height. */						\
 		screen->h,					/* Dest width. */						\
 		-1,							/* Amount to increment for each y pixel */\
-		(sdl_surf->pitch/sdl_surf->format->BytesPerPixel),/* Amount to increment for each x pixel */\
+		(sdl_surf->pitch/SDL_BYTESPERPIXEL(sdl_surf->format)),/* Amount to increment for each x pixel */\
 		manip);						/* Manipulator methods. */
 #endif
 // Rotates
@@ -356,7 +356,7 @@ void Application::show_8to32_blur
 		screen->pitch,				/* Pixels/line for source. */			\
 																			\
 		(DestType*)(sdl_surf->pixels)+screen->h-1, /* ->dest pixels. */	\
-		(sdl_surf->pitch/sdl_surf->format->BytesPerPixel),/* Amount to increment for each x pixel */\
+		(sdl_surf->pitch/SDL_BYTESPERPIXEL(sdl_surf->format)),/* Amount to increment for each x pixel */\
 		-1,							/* Amount to increment for each y pixel */\
 		manip);						/* Manipulator methods. */
 

@@ -1031,7 +1031,7 @@ void FadeEffect::init(FadeType fade, FadeDirection dir, uint32 color, SDL_Surfac
     if(capture)
     {
         fade_from = SDL_CreateRGBSurface(SDL_SWSURFACE, capture->w, capture->h,
-                                         capture->format->BitsPerPixel, 0, 0, 0, 0);
+                                         SDL_BITSPERPIXEL(capture->format), 0, 0, 0, 0);
         for(uint32 p = 0, pixels = (capture->w*capture->h); p < pixels; p++)
             ((uint8*)fade_from->pixels)[p] = ((uint8*)capture->pixels)[p];
     }
@@ -1098,7 +1098,7 @@ void FadeEffect::init_pixelated_fade()
                 fillret = SDL_FillRect(overlay, NULL, uint32(pixelated_color));
         }
     }
-    if(fillret == -1)
+    if(fillret == -1 || fillret == 0) // SDL 3 returns true on success
     {
         DEBUG(0,LEVEL_DEBUGGING,"FadeEffect: error creating overlay surface\n");
         delete_self();

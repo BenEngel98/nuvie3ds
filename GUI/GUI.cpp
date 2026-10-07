@@ -266,15 +266,21 @@ GUI:: HandleEvent(SDL_Event *event)
     }
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)
+	// SDL 3 gives window coordinates in the event itself (also for events
+	// we push ourselves), so map those into the game area.
 	if(event->type == SDL_MOUSEBUTTONDOWN || event->type == SDL_MOUSEBUTTONUP)
 	{
-		SDL_GetMouseState(&event->button.x, &event->button.y);
-		screen->scale_sdl_window_coords(&event->button.x, &event->button.y);
+		sint32 ix = (sint32)event->button.x, iy = (sint32)event->button.y;
+		screen->scale_sdl_window_coords(&ix, &iy);
+		event->button.x = (float)ix;
+		event->button.y = (float)iy;
 	}
 	if(event->type == SDL_MOUSEMOTION)
 	{
-		SDL_GetMouseState(&event->motion.x, &event->motion.y);
-		screen->scale_sdl_window_coords(&event->motion.x, &event->motion.y);
+		sint32 ix = (sint32)event->motion.x, iy = (sint32)event->motion.y;
+		screen->scale_sdl_window_coords(&ix, &iy);
+		event->motion.x = (float)ix;
+		event->motion.y = (float)iy;
 	}
 #endif
 
@@ -299,15 +305,15 @@ GUI:: HandleEvent(SDL_Event *event)
 #ifdef HAVE_JOYSTICK_SUPPORT
 	if(event->type >= SDL_JOYAXISMOTION && event->type <= SDL_JOYBUTTONUP)
 	{
-		event->key.keysym.sym = Game::get_game()->get_keybinder()->get_key_from_joy_events(event);
-		if(event->key.keysym.sym == SDLK_UNKNOWN) // isn't mapped, is in deadzone, or axis didn't return to center before moving again
+		event->key.key = Game::get_game()->get_keybinder()->get_key_from_joy_events(event);
+		if(event->key.key == SDLK_UNKNOWN) // isn't mapped, is in deadzone, or axis didn't return to center before moving again
 		{
 			HandleStatus(status);
 			CleanupDeletedWidgets(status != GUI_QUIT);
 			return status; // pretend nothing happened
 		}
 		event->type = SDL_KEYDOWN;
-		event->key.keysym.mod = KMOD_NONE;
+		event->key.mod = KMOD_NONE;
 	}
 #endif
 	  switch (event->type) {

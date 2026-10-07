@@ -414,11 +414,11 @@ GUI_status GUI_Widget::HandleEvent(const SDL_Event *event)
 
 	switch (event->type) {
 		case SDL_KEYDOWN: {
-			return(KeyDown(event->key.keysym));
+			return(KeyDown(nuvie_keysym(event)));
 		}
 		break;
 		case SDL_KEYUP: {
-			return(KeyUp(event->key.keysym));
+			return(KeyUp(nuvie_keysym(event)));
 		}
 		break;
 		case SDL_MOUSEBUTTONDOWN: {

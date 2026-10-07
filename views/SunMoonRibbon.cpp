@@ -83,7 +83,7 @@ void SunMoonRibbon::loadBgImage(uint8 num)
     SDL_FreeSurface(bg_data);
   bg_data = bmp.getSdlSurface32(imagefile);
 
-  Uint32 bg_color_key = SDL_MapRGB(bg_data->format, 0xb3, 0x94, 0x78);
+  Uint32 bg_color_key = SDL_MapSurfaceRGB(bg_data, 0xb3, 0x94, 0x78);
   SDL_SetColorKey(bg_data, SDL_TRUE, bg_color_key);
 }
 

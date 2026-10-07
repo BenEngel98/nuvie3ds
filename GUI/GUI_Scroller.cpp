@@ -51,7 +51,7 @@ GUI_Scroller::GUI_Scroller(int x, int y, int w, int h, Uint8 r, Uint8 g, Uint8 b
 void GUI_Scroller::SetDisplay(Screen *s)
 {
 	GUI_Widget::SetDisplay(s);
-	bg_color = SDL_MapRGB(surface->format, R, G, B);
+	bg_color = SDL_MapSurfaceRGB(surface, R, G, B);
 }
 
 int GUI_Scroller::AddWidget(GUI_Widget *widget)

@@ -26,7 +26,7 @@
 #define _GUI_loadimage_h
 
 #include "SDL.h"
-#include "begin_code.h"
+// begin_code.h (SDL1 only)
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -54,6 +54,6 @@ extern Uint8 *GUI_FontGumpWData(void);
 #ifdef __cplusplus
 };
 #endif
-#include "close_code.h"
+// close_code.h (SDL1 only)
 
 #endif /* _GUI_loadimage_h */

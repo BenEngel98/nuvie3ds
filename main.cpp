@@ -35,6 +35,9 @@
 #include "nuvie.h"
 
 #include "main.h"
+#ifdef __3DS__
+#include "n3ds_platform.h"
+#endif
 
 #ifdef MACOSX
 #include <CoreFoundation/CoreFoundation.h>
@@ -45,6 +48,9 @@ int main(int argc, char **argv)
 #endif
 {
  Nuvie *nuvie;
+#ifdef __3DS__
+ n3ds_platform_init();
+#endif
  DEBUG(0,LEVEL_INFORMATIONAL,"Debugging enabled\n");
  DEBUG(1,LEVEL_DEBUGGING,"To disable debugging altogether, recompile with \"WITHOUT_DEBUG\" defined.\n");
  DEBUG(1,LEVEL_DEBUGGING,"To just get less spam, set the default for CurrentDebugLevel in Debug.cpp lower.\n");
@@ -78,6 +84,9 @@ int main(int argc, char **argv)
  {
    ConsolePause();
    delete nuvie;
+#ifdef __3DS__
+   std::exit(1); // run static destructors before SDL's 3DS wrapper unmounts romfs
+#endif
    return 1;
  }
 
@@ -85,5 +94,8 @@ int main(int argc, char **argv)
 
  delete nuvie;
 
+#ifdef __3DS__
+ std::exit(0);
+#endif
  return 0;
 }

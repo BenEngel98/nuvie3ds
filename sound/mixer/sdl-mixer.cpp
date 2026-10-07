@@ -41,6 +41,9 @@
 SdlMixerManager::SdlMixerManager()
 	:
 	_mixer(0),
+	_stream(0),
+	_mixBuf(0),
+	_mixBufLen(0),
 	_audioSuspended(false) {
 
 }
@@ -48,28 +51,33 @@ SdlMixerManager::SdlMixerManager()
 SdlMixerManager::~SdlMixerManager() {
 	_mixer->setReady(false);
 
-	SDL_CloseAudio();
+	if (_stream)
+		SDL_DestroyAudioStream(_stream);
+	delete [] _mixBuf;
 
 	delete _mixer;
 }
 
 void SdlMixerManager::init() {
 	// Start SDL Audio subsystem
-	if (SDL_InitSubSystem(SDL_INIT_AUDIO) == -1) {
+	if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
 		DEBUG(0, LEVEL_ERROR, "Could not initialize SDL: %s", SDL_GetError());
 	}
 
 	// Get the desired audio specs
 	SDL_AudioSpec desired = getAudioSpec(SAMPLES_PER_SEC);
 
-	// Start SDL audio with the desired specs
-	if (SDL_OpenAudio(&desired, &_obtainedRate) != 0) {
+	// Start SDL audio with the desired specs.  The device converts from
+	// our 22 kHz stereo 16-bit to whatever it actually runs at.
+	_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &desired, sdlCallback, this);
+	if (_stream == NULL) {
 		DEBUG(0,LEVEL_WARNING, "Could not open audio device: %s", SDL_GetError());
 
 		_mixer = new Audio::MixerImpl(desired.freq);
 		assert(_mixer); 
 		_mixer->setReady(false);
 	} else {
+		_obtainedRate = desired;
 		DEBUG(0,LEVEL_INFORMATIONAL, "Output sample rate: %d Hz", _obtainedRate.freq);
 
 		_mixer = new Audio::MixerImpl(_obtainedRate.freq);
@@ -100,18 +108,17 @@ SDL_AudioSpec SdlMixerManager::getAudioSpec(uint32 outputRate) {
 
 	memset(&desired, 0, sizeof(desired));
 	desired.freq = samplesPerSec;
-	desired.format = AUDIO_S16SYS;
+	desired.format = SDL_AUDIO_S16;
 	desired.channels = 2;
-	desired.samples = (uint16)samples;
-	desired.callback = sdlCallback;
-	desired.userdata = this;
+	(void)samples;
 
 	return desired;
 }
 
 void SdlMixerManager::startAudio() {
 	// Start the sound system
-	SDL_PauseAudio(0);
+	if (_stream)
+		SDL_ResumeAudioStreamDevice(_stream);
 }
 
 void SdlMixerManager::callbackHandler(uint8 *samples, int len) {
@@ -119,25 +126,36 @@ void SdlMixerManager::callbackHandler(uint8 *samples, int len) {
 	_mixer->mixCallback(samples, len);
 }
 
-void SdlMixerManager::sdlCallback(void *this_, uint8 *samples, int len) {
+// SDL 3 asks for more data whenever the stream runs low; mix that much and
+// queue it.  The old mixer wrote into a fixed buffer, so keep one around.
+void SDLCALL SdlMixerManager::sdlCallback(void *this_, SDL_AudioStream *stream, int additional_amount, int total_amount) {
 	SdlMixerManager *manager = (SdlMixerManager *)this_;
 	assert(manager);
+	(void)total_amount;
 
-	manager->callbackHandler(samples, len);
+	if (additional_amount <= 0)
+		return;
+	if (manager->_mixBufLen < additional_amount) {
+		delete [] manager->_mixBuf;
+		manager->_mixBuf = new uint8[additional_amount];
+		manager->_mixBufLen = additional_amount;
+	}
+	manager->callbackHandler(manager->_mixBuf, additional_amount);
+	SDL_PutAudioStreamData(stream, manager->_mixBuf, additional_amount);
 }
 
 void SdlMixerManager::suspendAudio() {
-	SDL_CloseAudio();
+	if (_stream)
+		SDL_PauseAudioStreamDevice(_stream);
 	_audioSuspended = true;
 }
 
 int SdlMixerManager::resumeAudio() {
 	if (!_audioSuspended)
 		return -2;
-	if (SDL_OpenAudio(&_obtainedRate, NULL) < 0){
+	if (!_stream || !SDL_ResumeAudioStreamDevice(_stream)){
 		return -1;
 	}
-	SDL_PauseAudio(0);
 	_audioSuspended = false;
 	return 0;
 }

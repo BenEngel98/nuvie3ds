@@ -30,6 +30,9 @@
 #include "ActorManager.h"
 #include "ViewManager.h"
 #include "MapWindow.h"
+#ifdef __3DS__
+#include "n3ds_platform.h"
+#endif
 #include "Event.h"
 #include "MsgScroll.h"
 #include "MsgScrollNewUI.h"
@@ -247,7 +250,7 @@ bool MapWindow::init(TileManager *tm, ObjManager *om, ActorManager *am)
  // hide the window until game is fully loaded and does fade-in
  get_overlay(); // this allocates `overlay`
  overlay_level = MAP_OVERLAY_ONTOP;
- assert(SDL_FillRect(overlay, NULL, game->get_palette()->get_bg_color()) == 0);
+ assert(SDL_FillRect(overlay, NULL, game->get_palette()->get_bg_color()));
 
  wizard_eye_info.eye_tile = tile_manager->get_tile(TILE_U6_WIZARD_EYE);
  wizard_eye_info.moves_left = 0;
@@ -706,7 +709,11 @@ void MapWindow::update()
     if(walking)
     {
 
+#ifdef __3DS__
+        if(n3ds_mouse_state(NULL, NULL) & walk_button_mask)
+#else
         if(SDL_GetMouseState(NULL, NULL) & walk_button_mask)
+#endif
         {
         	if(game->user_paused())
         		return;
@@ -749,8 +756,8 @@ void MapWindow::update()
 		{
 			SDL_Event sdl_event;
 			sdl_event.type = SDL_KEYDOWN;
-			sdl_event.key.keysym.sym = key;
-			sdl_event.key.keysym.mod = KMOD_NONE;
+			sdl_event.key.key = key;
+			sdl_event.key.mod = KMOD_NONE;
 			if(GUI::get_gui()->HandleEvent(&sdl_event) == GUI_PASS)
 				event->handleEvent(&sdl_event);
 		}
@@ -1021,7 +1028,7 @@ void MapWindow::Display(bool full_redraw)
    drawActors();
 
  if(overlay && overlay_level == MAP_OVERLAY_DEFAULT)
-   screen->blit(area.x, area.y, (unsigned char *)(overlay->pixels), overlay->format->BitsPerPixel, overlay->w, overlay->h, overlay->pitch, true, &clip_rect);
+   screen->blit(area.x, area.y, (unsigned char *)(overlay->pixels), SDL_BITSPERPIXEL(overlay->format), overlay->w, overlay->h, overlay->pitch, true, &clip_rect);
 
  drawAnims(true);
 
@@ -1039,7 +1046,7 @@ void MapWindow::Display(bool full_redraw)
 	 drawBorder();
 
  if(overlay && overlay_level == MAP_OVERLAY_ONTOP)
-   screen->blit(area.x, area.y, (unsigned char *)(overlay->pixels), overlay->format->BitsPerPixel, overlay->w, overlay->h, overlay->pitch, true, &clip_rect);
+   screen->blit(area.x, area.y, (unsigned char *)(overlay->pixels), SDL_BITSPERPIXEL(overlay->format), overlay->w, overlay->h, overlay->pitch, true, &clip_rect);
 
 // ptr = (unsigned char *)screen->get_pixels();
 // ptr += 8 * screen->get_pitch() + 8;
@@ -2972,7 +2979,7 @@ void MapWindow::loadRoofTiles()
 	roof_tiles = SDL_LoadBMP(imagefile.c_str());
 	if(roof_tiles && game->is_orig_style())
 	{
-		SDL_SetColorKey(roof_tiles, SDL_TRUE, SDL_MapRGB(roof_tiles->format, 0, 0x70, 0xfc));
+		SDL_SetColorKey(roof_tiles, SDL_TRUE, SDL_MapSurfaceRGB(roof_tiles, 0, 0x70, 0xfc));
 	}
 }
 

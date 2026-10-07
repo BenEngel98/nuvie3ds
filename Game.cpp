@@ -492,7 +492,7 @@ void Game::init_cursor()
 		cursor = new Cursor();
 
     if(cursor->init(config, screen, game_type))
-       SDL_ShowCursor(false); // won't need the system default
+       SDL_HideCursor(); // won't need the system default
     else
     {
         delete cursor;

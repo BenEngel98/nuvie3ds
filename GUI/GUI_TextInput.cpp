@@ -263,8 +263,8 @@ void GUI_TextInput::set_text(const char *new_text)
 void GUI_TextInput::SetDisplay(Screen *s)
 {
 	GUI_Widget::SetDisplay(s);
-	cursor_color = SDL_MapRGB(surface->format, 0xff, 0, 0);
-    selected_bgcolor = SDL_MapRGB(surface->format, 0x5a, 0x6e, 0x91);
+	cursor_color = SDL_MapSurfaceRGB(surface, 0xff, 0, 0);
+    selected_bgcolor = SDL_MapSurfaceRGB(surface, 0x5a, 0x6e, 0x91);
 }
 
 

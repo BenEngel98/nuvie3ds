@@ -195,10 +195,10 @@ void GUI_Button:: Display(bool full_redraw)
 	if (!enabled)
 	{
 	  Uint8 *pointer;
-	  int pixel=SDL_MapRGB(surface->format,0,0,0);;
-	  Uint8 bytepp=surface->format->BytesPerPixel;
+	  int pixel=SDL_MapSurfaceRGB(surface,0,0,0);;
+	  Uint8 bytepp=SDL_BYTESPERPIXEL(surface->format);
 
-	  if (!SDL_LockSurface(surface))
+	  if (SDL_LockSurface(surface))
 	  {
 	    for (int y=0;y<area.h;y+=2)
 	    {
@@ -218,12 +218,12 @@ void GUI_Button:: Display(bool full_redraw)
 	        case 3:  /* Format/endian independent */
 		  Uint8 r, g, b;
 
-		  r = (pixel>>surface->format->Rshift)&0xFF;
-		  g = (pixel>>surface->format->Gshift)&0xFF;
-		  b = (pixel>>surface->format->Bshift)&0xFF;
-		  *((pointer)+surface->format->Rshift/8) = r;
-		  *((pointer)+surface->format->Gshift/8) = g;
-		  *((pointer)+surface->format->Bshift/8) = b;
+		  r = (pixel>>nuvie_fmt(surface)->Rshift)&0xFF;
+		  g = (pixel>>nuvie_fmt(surface)->Gshift)&0xFF;
+		  b = (pixel>>nuvie_fmt(surface)->Bshift)&0xFF;
+		  *((pointer)+nuvie_fmt(surface)->Rshift/8) = r;
+		  *((pointer)+nuvie_fmt(surface)->Gshift/8) = g;
+		  *((pointer)+nuvie_fmt(surface)->Bshift/8) = b;
 		  pointer+=6;
 		  break;
 	        case 4:
@@ -317,10 +317,10 @@ SDL_Surface* GUI_Button::CreateTextButtonImage(int style, const char *text, int 
 
   if (img==NULL) return NULL;
 
-  Uint32 color1=SDL_MapRGB(img->format,BL_R,BL_G,BL_B);
-  Uint32 color2=SDL_MapRGB(img->format,BS_R,BS_G,BS_B);
-  Uint32 color3=SDL_MapRGB(img->format,BF_R,BF_G,BF_B);
-  Uint32 color4=SDL_MapRGB(img->format,BI2_R,BI2_G,BI2_B);
+  Uint32 color1=SDL_MapSurfaceRGB(img,BL_R,BL_G,BL_B);
+  Uint32 color2=SDL_MapSurfaceRGB(img,BS_R,BS_G,BS_B);
+  Uint32 color3=SDL_MapSurfaceRGB(img,BF_R,BF_G,BF_B);
+  Uint32 color4=SDL_MapSurfaceRGB(img,BI2_R,BI2_G,BI2_B);
 
 
   buttonFont->SetColoring(0,0,0);

@@ -27,7 +27,7 @@
 
 int SDL_SetColors(SDL_Surface *surface, SDL_Color *colors, int firstcolor, int ncolors)
 {
-    return SDL_SetPaletteColors(surface->format->palette, colors, firstcolor, ncolors);
+    return SDL_SetPaletteColors(SDL_GetSurfacePalette(surface), colors, firstcolor, ncolors) ? 0 : -1;
 }
 
 #endif

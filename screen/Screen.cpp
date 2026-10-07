@@ -39,6 +39,10 @@
 #include "Surface.h"
 #include "Scale.h"
 #include "Screen.h"
+#ifdef __3DS__
+#include "n3ds_platform.h"
+#include "n3ds_kbd.h"
+#endif
 #include "MapWindow.h"
 #include "Background.h"
 
@@ -99,9 +103,16 @@ Screen::~Screen()
  SDL_Quit();
 }
 
+#ifdef __3DS__
+Screen *Screen::n3ds_instance = NULL;
+#endif
+
 bool Screen::init()
 {
  std::string str;
+#ifdef __3DS__
+ n3ds_instance = this;
+#endif
 
  int new_width, new_height;
  config->value("config/video/screen_width", new_width, 320);
@@ -117,7 +128,7 @@ bool Screen::init()
  height = (uint16)new_height;
 
   	/* Initialize the SDL library */
-	if ( SDL_Init(SDL_INIT_VIDEO) < 0 ) {
+	if ( !SDL_Init(SDL_INIT_VIDEO) ) {
 		DEBUG(0,LEVEL_EMERGENCY, "Couldn't initialize SDL: %s\n",
 			SDL_GetError());
    return false;
@@ -142,7 +153,10 @@ config->value("config/video/scale_factor", scale_factor, 1);
 
  set_screen_mode();
 
-#if SDL_VERSION_ATLEAST(2, 0, 0)
+#ifdef __3DS__
+    n3ds_input_start(sdlWindow);
+    n3ds_set_mirror_surface(sdl_surface);
+#elif SDL_VERSION_ATLEAST(2, 0, 0)
     SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 255);
     SDL_RenderClear(sdlRenderer);
     SDL_RenderPresent(sdlRenderer);
@@ -1368,11 +1382,13 @@ void Screen::update()
                  0, 0, surface->w, surface->h,							// x, y, w, h
 				         surface->pitch/surface->bytes_per_pixel, surface->h,	// pixels/line, pixels/col
 				         sdl_surface->pixels,									// dest
-				         sdl_surface->pitch/sdl_surface->format->BytesPerPixel,	// destpixels/line
+				         sdl_surface->pitch/SDL_BYTESPERPIXEL(sdl_surface->format),	// destpixels/line
                  scale_factor);
   }
 
-#if SDL_VERSION_ATLEAST(2, 0, 0)
+#ifdef __3DS__
+    n3ds_present();
+#elif SDL_VERSION_ATLEAST(2, 0, 0)
     SDL_UpdateTexture(sdlTexture, NULL, sdl_surface->pixels, sdl_surface->pitch);
     SDL_RenderClear(sdlRenderer);
     SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL);
@@ -1414,7 +1430,7 @@ void Screen::update(sint32 x, sint32 y, uint16 w, uint16 h)
                  x, y, w, h,							// x, y, w, h
                  surface->pitch/surface->bytes_per_pixel, surface->h,	// pixels/line, pixels/col
                  sdl_surface->pixels,									// dest
-                 sdl_surface->pitch/sdl_surface->format->BytesPerPixel,	// destpixels/line
+                 sdl_surface->pitch/SDL_BYTESPERPIXEL(sdl_surface->format),	// destpixels/line
                  scale_factor);
   }
 
@@ -1440,7 +1456,9 @@ void Screen::update(sint32 x, sint32 y, uint16 w, uint16 h)
 
 void Screen::preformUpdate()
 {
-#if SDL_VERSION_ATLEAST(2, 0, 0)
+#ifdef __3DS__
+    n3ds_present();
+#elif SDL_VERSION_ATLEAST(2, 0, 0)
     SDL_UpdateTexture(sdlTexture, NULL, sdl_surface->pixels, sdl_surface->pitch);
     SDL_RenderClear(sdlRenderer);
     SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL);
@@ -1450,6 +1468,43 @@ void Screen::preformUpdate()
 #endif
  num_update_rects = 0;
 }
+
+#ifdef __3DS__
+// The whole screen is ours: copy the game's frame to the middle of the
+// window surface and show it, then let the other screen catch up.
+void Screen::n3ds_present()
+{
+    if(sdlWindow && sdl_surface)
+    {
+        SDL_Surface *ws = SDL_GetWindowSurface(sdlWindow);
+        if(ws)
+        {
+            SDL_Rect dst = { (ws->w - sdl_surface->w) / 2, (ws->h - sdl_surface->h) / 2, sdl_surface->w, sdl_surface->h };
+            SDL_BlitSurface(sdl_surface, NULL, ws, &dst);
+            SDL_UpdateWindowSurface(sdlWindow);
+        }
+    }
+    n3ds_kbd_present();
+    n3ds_frame();
+}
+
+// Tear down the window and build it again on the other screen.  The
+// software surface (what the game draws into) survives.
+void Screen::n3ds_move_window(bool bottom)
+{
+    (void)bottom; // n3ds_game_on_bottom() already says where to go
+    if(sdlWindow) { SDL_DestroyWindow(sdlWindow); sdlWindow = NULL; }
+    init_sdl2_window(1);
+    if(sdlWindow)
+    {
+        if(SDL_Surface *ws = SDL_GetWindowSurface(sdlWindow))
+        {
+            SDL_FillSurfaceRect(ws, NULL, 0);
+            SDL_UpdateWindowSurface(sdlWindow);
+        }
+    }
+}
+#endif
 
 void Screen::lock()
 {
@@ -1481,14 +1536,17 @@ bool Screen::SDL_VideoModeOK(int scaled_width, int scaled_height, int bpp, int f
 
 int Screen::get_screen_bpp()
 {
+#ifdef __3DS__
+    return 16; // cheapest for the software renderer; what the game was written for anyway
+#endif
 #if SDL_VERSION_ATLEAST(2, 0, 0)
-    SDL_DisplayMode mode;
-    if(SDL_GetDisplayMode(0, 0, &mode) != 0)
+    const SDL_DisplayMode *mode = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+    if(mode == NULL)
     {
         return 0;
     }
 
-    return SDL_BITSPERPIXEL(mode.format);
+    return SDL_BITSPERPIXEL(mode->format);
 #else
     // Get info. about video.
 	const SDL_VideoInfo *vinfo = SDL_GetVideoInfo();
@@ -1508,40 +1566,64 @@ bool Screen::init_sdl2_window(uint16 scale)
     if(non_square_pixels)
         window_scale_h *= 1.2;
 
-    SDL_CreateWindowAndRenderer(width*window_scale_w, (int)(height*window_scale_h), SDL_WINDOW_SHOWN, &sdlWindow, &sdlRenderer);
+#ifdef __3DS__
+    // The 3DS always gives us the whole screen; the game sits in the middle 1:1.
+    {
+        int            count    = 0;
+        SDL_DisplayID* displays = SDL_GetDisplays(&count);
+        const bool     bottom   = n3ds_game_on_bottom();
+        SDL_DisplayID  target   = (displays && count > (bottom ? 1 : 0)) ? displays[bottom ? 1 : 0] : 0;
+        SDL_free(displays);
+        SDL_PropertiesID props = SDL_CreateProperties();
+        SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "Nuvie");
+        if(target)
+        {
+            SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED_DISPLAY(target));
+            SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED_DISPLAY(target));
+        }
+        SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, bottom ? 320 : 400);
+        SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, 240);
+        SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_FULLSCREEN_BOOLEAN, true);
+        sdlWindow = SDL_CreateWindowWithProperties(props);
+        SDL_DestroyProperties(props);
+        sdlRenderer = NULL; // the 3DS path blits straight to the window surface
+    }
+    if(sdlWindow == NULL)
+        return false;
+    window_scale_w = window_scale_h = 1.0f;
+#else
+    SDL_CreateWindowAndRenderer("Nuvie", width*window_scale_w, (int)(height*window_scale_h), 0, &sdlWindow, &sdlRenderer);
     if(sdlWindow == NULL || sdlRenderer == NULL)
         return false;
 
-    SDL_SetWindowTitle(sdlWindow, "Nuvie");
-    //SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");  // make the scaled rendering look smoother.
-    SDL_RenderSetLogicalSize(sdlRenderer, width*window_scale_w, (int)(height*window_scale_h)); //VGA non-square pixels.
+    SDL_SetRenderLogicalPresentation(sdlRenderer, width*window_scale_w, (int)(height*window_scale_h), SDL_LOGICAL_PRESENTATION_LETTERBOX); //VGA non-square pixels.
+#endif
 
+#ifndef __3DS__
     set_fullscreen(fullscreen);
+#endif
 
     return true;
 }
 
 bool Screen::create_sdl_surface_and_texture(sint32 w, sint32 h, Uint32 format)
 {
-    uint32 rmask, gmask, bmask, amask;
-    int bpp;
-
-    if(!SDL_PixelFormatEnumToMasks(format, &bpp, &rmask, &gmask, &bmask, &amask))
-        return false;
-
-    sdl_surface = SDL_CreateRGBSurface(0, w, h, bpp,
-                                       rmask,
-                                       gmask,
-                                       bmask,
-                                       amask);
+#ifdef __3DS__
+    n3ds_texture_format = format;
+#endif
+    sdl_surface = SDL_CreateSurface(w, h, (SDL_PixelFormat)format);
 
     if(sdl_surface == NULL) {
         fprintf(stderr, "CreateRGBSurface failed: %s\n", SDL_GetError());
         return false;
     }
+#ifdef __3DS__
+    sdlTexture = NULL;
+    return true;
+#endif
 
     sdlTexture = SDL_CreateTexture(sdlRenderer,
-                                   format,
+                                   (SDL_PixelFormat)format,
                                    SDL_TEXTUREACCESS_STREAMING,
                                    w, h);
 
@@ -1647,7 +1729,7 @@ void Screen::set_screen_mode()
 #endif
 	}
 
-	surface->set_format(sdl_surface->format);
+	surface->set_format(SDL_GetPixelFormatDetails(sdl_surface->format));
 
 
 //	if (zbuffer) screen->create_zbuffer();
@@ -1679,7 +1761,7 @@ bool Screen::sdl1_toggle_fullscreen()
         if ( SDL_GetVideoInfo()->hw_available && doubleBuffer)
             flags |= SDL_HWSURFACE|SDL_DOUBLEBUF;
     }
-    uint8 bpp = get_sdl_surface()->format->BitsPerPixel;
+    uint8 bpp = SDL_BITSPERPIXEL(get_sdl_surface()->format);
 
     if(!SDL_VideoModeOK(scaled_width, scaled_height, bpp, flags))
     {
@@ -1703,14 +1785,8 @@ bool Screen::set_fullscreen(bool value)
 {
 #if SDL_VERSION_ATLEAST(2, 0, 0)
     fullscreen = value;
-    Uint32 windowFlags = SDL_GetWindowFlags(sdlWindow);
 
-    if(fullscreen)
-        windowFlags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
-    else if((windowFlags & SDL_WINDOW_FULLSCREEN_DESKTOP) == SDL_WINDOW_FULLSCREEN_DESKTOP)
-        windowFlags ^= SDL_WINDOW_FULLSCREEN_DESKTOP;
-
-    if(SDL_SetWindowFullscreen(sdlWindow, windowFlags) < 0)
+    if(!SDL_SetWindowFullscreen(sdlWindow, fullscreen))
     {
         DEBUG(0,LEVEL_NOTIFICATION,"error toggling fullscreen mode %s\n",SDL_GetError());
         return false;
@@ -1845,7 +1921,7 @@ unsigned char *Screen::copy_area(SDL_Rect *area, uint16 down_scale)
 
 unsigned char *Screen::copy_area16(SDL_Rect *area, uint16 down_scale)
 {
- SDL_PixelFormat *fmt;
+ const SDL_PixelFormatDetails *fmt;
  SDL_Surface *main_surface = get_sdl_surface();
  unsigned char *dst_pixels = NULL;
  unsigned char *ptr;
@@ -1858,7 +1934,7 @@ unsigned char *Screen::copy_area16(SDL_Rect *area, uint16 down_scale)
  dst_pixels = new unsigned char[((area->w / down_scale) * (area->h / down_scale)) * 3];
  ptr = dst_pixels;
 
- fmt = main_surface->format;
+ fmt = SDL_GetPixelFormatDetails(main_surface->format);
 
  for(y = 0; y < area->h; y += down_scale)
   {
@@ -1877,15 +1953,15 @@ unsigned char *Screen::copy_area16(SDL_Rect *area, uint16 down_scale)
         {
          ra = *src_pixels & fmt->Rmask;
          ra >>= fmt->Rshift;
-         ra <<= fmt->Rloss;
+         ra <<= (8 - fmt->Rbits);
 
          ga = *src_pixels & fmt->Gmask;
          ga >>= fmt->Gshift;
-         ga <<= fmt->Gloss;
+         ga <<= (8 - fmt->Gbits);
 
          ba = *src_pixels & fmt->Bmask;
          ba >>= fmt->Bshift;
-         ba <<= fmt->Bloss;
+         ba <<= (8 - fmt->Bbits);
 
          r += ra;
          g += ga;
@@ -1908,7 +1984,7 @@ unsigned char *Screen::copy_area16(SDL_Rect *area, uint16 down_scale)
 
 unsigned char *Screen::copy_area32(SDL_Rect *area, uint16 down_scale)
 {
- SDL_PixelFormat *fmt;
+ const SDL_PixelFormatDetails *fmt;
  SDL_Surface *main_surface = get_sdl_surface();
  unsigned char *dst_pixels = NULL;
  unsigned char *ptr;
@@ -1921,7 +1997,7 @@ unsigned char *Screen::copy_area32(SDL_Rect *area, uint16 down_scale)
  dst_pixels = new unsigned char[((area->w / down_scale) * (area->h / down_scale)) * 3];
  ptr = dst_pixels;
 
- fmt = main_surface->format;
+ fmt = SDL_GetPixelFormatDetails(main_surface->format);
 
  for(y = 0; y < area->h; y += down_scale)
   {
@@ -1940,15 +2016,15 @@ unsigned char *Screen::copy_area32(SDL_Rect *area, uint16 down_scale)
         {
          ra = *src_pixels & fmt->Rmask;
          ra >>= fmt->Rshift;
-         ra <<= fmt->Rloss;
+         ra <<= (8 - fmt->Rbits);
 
          ga = *src_pixels & fmt->Gmask;
          ga >>= fmt->Gshift;
-         ga <<= fmt->Gloss;
+         ga <<= (8 - fmt->Gbits);
 
          ba = *src_pixels & fmt->Bmask;
          ba >>= fmt->Bshift;
-         ba <<= fmt->Bloss;
+         ba <<= (8 - fmt->Bbits);
 
          r += ra;
          g += ga;
@@ -2165,7 +2241,14 @@ void Screen::draw_line (int sx, int sy, int ex, int ey, uint8 color)
 
 void Screen::get_mouse_location(sint32 *x, sint32 *y)
 {
-    SDL_GetMouseState(x, y);
+    float fx, fy;
+#ifdef __3DS__
+    n3ds_mouse_state(&fx, &fy);
+#else
+    SDL_GetMouseState(&fx, &fy);
+#endif
+    *x = (sint32)fx;
+    *y = (sint32)fy;
 #if SDL_VERSION_ATLEAST(2, 0, 0)
     scale_sdl_window_coords(x, y);
 #else
@@ -2180,33 +2263,21 @@ void Screen::get_mouse_location(sint32 *x, sint32 *y)
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 void Screen::scale_sdl_window_coords(sint32 *mx, sint32 *my)
 {
-    if(fullscreen)
-    {
-        float sx, sy;
-        SDL_RenderGetScale(sdlRenderer, &sx, &sy);
-
-        SDL_Rect viewport;
-        SDL_RenderGetViewport(sdlRenderer, &viewport);
-
-        *mx = *mx - (sint32)((float)viewport.x * sx);
-
-        sx = ((float)viewport.w / width) * sx;
-        sy = ((float)viewport.h / height) * sy;
-
-        *mx = (sint32)((float)*mx / sx) ;
-        *my = (sint32)((float)*my / sy) ;
-    }
-    else
-    {
-        sint32 w, h;
-        SDL_RenderGetLogicalSize(sdlRenderer, &w, &h);
-
-        w = w / width;
-        h = h / height;
-
-        *mx = (sint32) ((float) *mx / window_scale_w);
-        *my = (sint32) ((float) *my / window_scale_h);
-    }
+#ifdef __3DS__
+    // The game sits centred in the window, 1:1.
+    int ww = width, wh = height;
+    if(sdlWindow)
+        SDL_GetWindowSize(sdlWindow, &ww, &wh);
+    *mx -= (ww - width) / 2;
+    *my -= (wh - height) / 2;
+#else
+    // Map window coordinates into the game's logical area, then undo the
+    // window scale (SDL 3 handles letterboxing for us).
+    float lx, ly;
+    SDL_RenderCoordinatesFromWindow(sdlRenderer, (float)*mx, (float)*my, &lx, &ly);
+    *mx = (sint32) (lx / window_scale_w);
+    *my = (sint32) (ly / window_scale_h);
+#endif
 }
 #endif
 
@@ -2225,7 +2296,7 @@ void Screen::set_non_square_pixels(bool value) {
     int sw = (int)(width*window_scale_w);
     int sh = (int)(height*window_scale_h);
 
-    SDL_RenderSetLogicalSize(sdlRenderer, sw, sh); //VGA non-square pixels.
+    SDL_SetRenderLogicalPresentation(sdlRenderer, sw, sh, SDL_LOGICAL_PRESENTATION_LETTERBOX); //VGA non-square pixels.
     SDL_SetWindowSize(sdlWindow, sw, sh);
 #endif
 }

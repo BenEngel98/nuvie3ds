@@ -23,9 +23,9 @@ SDL_Surface *GUI_LoadImage(int w, int h, Uint8 *pal, Uint8 *data)
 			data += w;
 		}
 		for ( int i=0; i<256; ++i ) {
-			image->format->palette->colors[i].r = *pal++;
-			image->format->palette->colors[i].g = *pal++;
-			image->format->palette->colors[i].b = *pal++;
+			SDL_GetSurfacePalette(image)->colors[i].r = *pal++;
+			SDL_GetSurfacePalette(image)->colors[i].g = *pal++;
+			SDL_GetSurfacePalette(image)->colors[i].b = *pal++;
 		}
 	}
 	return(image);

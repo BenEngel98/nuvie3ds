@@ -61,9 +61,9 @@ void
 GUI_Area:: SetDisplay(Screen *s)
 {
 	GUI_Widget::SetDisplay(s);
-	color = SDL_MapRGB(surface->format, R, G, B);
+	color = SDL_MapSurfaceRGB(surface, R, G, B);
 	if (useFrame)
-	  frameColor = SDL_MapRGB(surface->format, fR, fG, fB);
+	  frameColor = SDL_MapSurfaceRGB(surface, fR, fG, fB);
 }
 
 /* Show the widget  */

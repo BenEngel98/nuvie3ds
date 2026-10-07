@@ -1100,16 +1100,16 @@ static int nscript_input_poll(lua_State *L)
 #ifdef HAVE_JOYSTICK_SUPPORT
 		if(event.type >= SDL_JOYAXISMOTION && event.type <= SDL_JOYBUTTONUP)
 		{
-			event.key.keysym.sym = keybinder->get_key_from_joy_events(&event);
-			if(event.key.keysym.sym == SDLK_UNKNOWN) // make sure button isn't mapped or is in deadzone
+			event.key.key = keybinder->get_key_from_joy_events(&event);
+			if(event.key.key == SDLK_UNKNOWN) // make sure button isn't mapped or is in deadzone
 				return 0; // pretend nothing happened
 			event.type = SDL_KEYDOWN;
-			event.key.keysym.mod = KMOD_NONE;
+			event.key.mod = KMOD_NONE;
 		}
 #endif
 		if(event.type == SDL_KEYDOWN)
 		{
-			SDL_Keysym key = event.key.keysym;
+			SDL_Keysym key = nuvie_keysym(&event);
 			if((((key.mod & KMOD_CAPS) == KMOD_CAPS && (key.mod & KMOD_SHIFT) == 0) || ((key.mod & KMOD_CAPS) == 0 && (key.mod & KMOD_SHIFT)))
 			   && key.sym >= SDLK_a && key.sym <= SDLK_z)
 				key.sym = (SDL_Keycode)(key.sym -32);

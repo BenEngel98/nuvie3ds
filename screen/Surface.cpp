@@ -80,7 +80,7 @@ RenderSurface::RenderSurface(SDL_Surface *surf) : buffer(0), zbuffer_priv(0), sd
 		pixels((uint8 *) surf->pixels), zbuffer(0), w(surf->w), h(surf->h), pitch(surf->pitch),
 		gl(0), gr(surf->w), gt(0), gb(surf->h), lock_count(0)
 {
-	set_format(surf->format);
+	set_format(SDL_GetPixelFormatDetails(surf->format));
 }
 
 // Constructor for opengl surface
@@ -101,14 +101,14 @@ RenderSurface::~RenderSurface()
 //
 // Set the buffer format from SDL_PixelFormat
 //
-void RenderSurface::set_format(const SDL_PixelFormat *fmt)
+void RenderSurface::set_format(const SDL_PixelFormatDetails *fmt)
 {
-	bits_per_pixel = fmt->BitsPerPixel;
-	bytes_per_pixel = fmt->BytesPerPixel;
+	bits_per_pixel = fmt->bits_per_pixel;
+	bytes_per_pixel = fmt->bytes_per_pixel;
 
-	Rloss = fmt->Rloss;
-	Gloss = fmt->Gloss;
-	Bloss = fmt->Bloss;
+	Rloss = 8 - fmt->Rbits;
+	Gloss = 8 - fmt->Gbits;
+	Bloss = 8 - fmt->Bbits;
 	Rloss16 = Rloss+8;
 	Gloss16 = Gloss+8;
 	Bloss16 = Bloss+8;

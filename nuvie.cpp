@@ -47,6 +47,9 @@
 #include "SoundManager.h"
 
 #include "nuvie.h"
+#ifdef __3DS__
+#include "n3ds_platform.h"
+#endif
 
 #ifdef WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -307,6 +310,12 @@ bool Nuvie::initConfig()
  if(loadConfigFile(config_path))
    return true;
 
+#ifdef __3DS__
+ // First run: write the 3DS defaults next to the program.
+ if(n3ds_write_default_config("sdmc:/3ds/nuvie/nuvie.cfg") && loadConfigFile(config_path, NUVIE_CONF_READWRITE))
+   return true;
+#endif
+
 #ifndef WIN32
  // standard share locations
 
@@ -457,7 +466,7 @@ void Nuvie::set_safe_video_settings()
 {
 	config->set("config/video/scale_method", "point");
 
-	if(SDL_Init(SDL_INIT_VIDEO) != 0)
+	if(!SDL_Init(SDL_INIT_VIDEO))
 	{
 		DEBUG(0,LEVEL_ERROR,"Couldn't initialize SDL_VIDEO!\n");
 		exit(EXIT_FAILURE);

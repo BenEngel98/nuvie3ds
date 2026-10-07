@@ -3,7 +3,7 @@ project(nuvie)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${nuvie_SOURCE_DIR}/builds/cmake")
 
-find_package(SDL2 REQUIRED)
+find_package(SDL3 REQUIRED CONFIG)
 
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DLUA_USE_MACOSX -DUNIX -DMACOSX -DHAVE_JOYSTICK_SUPPORT")
@@ -23,7 +23,7 @@ ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-SET(SDL_VERSION "SDL2")
+SET(SDL_VERSION "SDL3")
 
 set(SOURCE_FILES
     actors/Actor.cpp
@@ -620,13 +620,36 @@ include_directories(views)
 
 #link_directories(/usr/local/lib)
 
+if(NINTENDO_3DS)
+    list(APPEND SOURCE_FILES
+        n3ds/n3ds_platform.cpp
+        n3ds/n3ds_platform.h
+        n3ds/n3ds_kbd.cpp
+        n3ds/n3ds_kbd.h
+        n3ds/n3ds_heap.cpp)
+    include_directories(n3ds)
+    add_definitions(-D__3DS__)
+endif()
+
 add_executable(nuvie ${SOURCE_FILES})
 
-TARGET_LINK_LIBRARIES(nuvie ${SDL2_LIBRARY})
+# Nuvie includes "SDL.h" unqualified; SDL3 ships it as <SDL3/SDL.h>.
+target_include_directories(nuvie BEFORE PRIVATE misc/sdl3shim)
+if(NINTENDO_3DS)
+    target_link_libraries(nuvie SDL3::SDL3-static)
+else()
+    target_link_libraries(nuvie SDL3::SDL3)
+endif()
 
 #IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 ##    TARGET_LINK_LIBRARIES(nuvie ${SDL_LIBS} -Wl,-framework,Cocoa)
-#    TARGET_LINK_LIBRARIES(nuvie ${SDL2_LIBRARY})
+#    # Nuvie includes "SDL.h" unqualified; SDL3 ships it as <SDL3/SDL.h>.
+target_include_directories(nuvie BEFORE PRIVATE misc/sdl3shim)
+if(NINTENDO_3DS)
+    target_link_libraries(nuvie SDL3::SDL3-static)
+else()
+    target_link_libraries(nuvie SDL3::SDL3)
+endif()
 #ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 #
 #IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")

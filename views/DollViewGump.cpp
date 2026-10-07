@@ -144,7 +144,7 @@ void DollViewGump::setColorKey(SDL_Surface *image)
 {
   if(image)
   {
-    bg_color_key = SDL_MapRGB(image->format, 0xf1, 0x0f, 0xc4);
+    bg_color_key = SDL_MapSurfaceRGB(image, 0xf1, 0x0f, 0xc4);
     SDL_SetColorKey(image, SDL_TRUE, bg_color_key);
   }
 }
