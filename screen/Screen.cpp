@@ -1471,6 +1471,29 @@ void Screen::preformUpdate()
 #ifdef __3DS__
 // The whole screen is ours: copy the game's frame to the middle of the
 // window surface and show it, then let the other screen catch up.
+// Where the game frame lands in the window: 1:1 and centred when it fits
+// (top screen), shrunk to fit otherwise (a 400-wide game on the 320-wide
+// touch screen).
+void Screen::n3ds_frame_rect(SDL_Rect *dst, float *scale)
+{
+    int ww = sdl_surface ? sdl_surface->w : width, wh = sdl_surface ? sdl_surface->h : height;
+    if(sdlWindow)
+        SDL_GetWindowSize(sdlWindow, &ww, &wh);
+    const int sw = sdl_surface ? sdl_surface->w : width;
+    const int sh = sdl_surface ? sdl_surface->h : height;
+    float sc = 1.0f;
+    if(sw > ww || sh > wh)
+    {
+        const float sx = (float)ww / sw, sy = (float)wh / sh;
+        sc = sx < sy ? sx : sy;
+    }
+    dst->w = (int)(sw * sc);
+    dst->h = (int)(sh * sc);
+    dst->x = (ww - dst->w) / 2;
+    dst->y = (wh - dst->h) / 2;
+    *scale = sc;
+}
+
 void Screen::n3ds_present()
 {
     if(sdlWindow && sdl_surface)
@@ -1478,8 +1501,13 @@ void Screen::n3ds_present()
         SDL_Surface *ws = SDL_GetWindowSurface(sdlWindow);
         if(ws)
         {
-            SDL_Rect dst = { (ws->w - sdl_surface->w) / 2, (ws->h - sdl_surface->h) / 2, sdl_surface->w, sdl_surface->h };
-            SDL_BlitSurface(sdl_surface, NULL, ws, &dst);
+            SDL_Rect dst;
+            float sc;
+            n3ds_frame_rect(&dst, &sc);
+            if(sc == 1.0f)
+                SDL_BlitSurface(sdl_surface, NULL, ws, &dst);
+            else
+                SDL_BlitSurfaceScaled(sdl_surface, NULL, ws, &dst, SDL_SCALEMODE_NEAREST);
             SDL_UpdateWindowSurface(sdlWindow);
         }
     }
@@ -2264,12 +2292,12 @@ void Screen::get_mouse_location(sint32 *x, sint32 *y)
 void Screen::scale_sdl_window_coords(sint32 *mx, sint32 *my)
 {
 #ifdef __3DS__
-    // The game sits centred in the window, 1:1.
-    int ww = width, wh = height;
-    if(sdlWindow)
-        SDL_GetWindowSize(sdlWindow, &ww, &wh);
-    *mx -= (ww - width) / 2;
-    *my -= (wh - height) / 2;
+    // Undo the centring (and the shrink on the touch screen).
+    SDL_Rect dst;
+    float sc;
+    n3ds_frame_rect(&dst, &sc);
+    *mx = (sint32)((*mx - dst.x) / sc);
+    *my = (sint32)((*my - dst.y) / sc);
 #else
     // Map window coordinates into the game's logical area, then undo the
     // window scale (SDL 3 handles letterboxing for us).

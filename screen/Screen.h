@@ -87,6 +87,7 @@ class Screen
    // Re-create the window on the other screen.
    void n3ds_move_window(bool bottom);
    void n3ds_present();
+   void n3ds_frame_rect(SDL_Rect *dst, float *scale);
 #endif
 
    bool is_fullscreen() { return fullscreen; }

@@ -333,6 +333,35 @@ static void n3ds_fix_config_paths(const char* path) {
 		text.replace(pos, 3, ">sdmc:/3ds/nuvie/");
 		changed = true;
 	}
+	// First-build configs were 320x200 "original"; move them to the wide
+	// layout once (the marker stops us doing it again if the player changes
+	// the video options back).
+	if (text.find("<n3ds_layout>") == std::string::npos) {
+		const char* old_video = "  <game_style>original</game_style>\n";
+		if ((pos = text.find(old_video)) != std::string::npos) {
+			text.replace(pos, std::strlen(old_video), "  <game_style>original+</game_style>\n");
+		}
+		struct Swap {
+			const char* from;
+			const char* to;
+		};
+		static const Swap swaps[] = {
+				{"<screen_width>320</screen_width>", "<screen_width>400</screen_width>"},
+				{"<screen_height>200</screen_height>", "<screen_height>240</screen_height>"},
+				{"<game_width>320</game_width>", "<game_width>400</game_width>"},
+				{"<game_height>200</game_height>", "<game_height>240</game_height>"},
+		};
+		for (const Swap& sw : swaps) {
+			if ((pos = text.find(sw.from)) != std::string::npos) {
+				text.replace(pos, std::strlen(sw.from), sw.to);
+			}
+		}
+		if ((pos = text.find("  <game_position>center</game_position>\n")) != std::string::npos) {
+			text.insert(pos, "  <n3ds_layout>2</n3ds_layout>\n");
+		}
+		changed = true;
+		std::printf("Nuvie 3DS: moved nuvie.cfg to the wide layout\n");
+	}
 	if (changed) {
 		f = std::fopen(path, "wb");
 		if (f) {
@@ -528,16 +557,17 @@ bool n3ds_write_default_config(const char* path) {
 			"  <enabled>no</enabled>\n"
 			" </cheats>\n"
 			" <video>\n"
-			"  <game_style>original</game_style>\n"
+			"  <game_style>original+</game_style>\n"
 			"  <scale_method>point</scale_method>\n"
 			"  <scale_factor>1</scale_factor>\n"
 			"  <fullscreen>no</fullscreen>\n"
 			"  <non_square_pixels>no</non_square_pixels>\n"
-			"  <screen_width>320</screen_width>\n"
-			"  <screen_height>200</screen_height>\n"
-			"  <game_width>320</game_width>\n"
-			"  <game_height>200</game_height>\n"
+			"  <screen_width>400</screen_width>\n"
+			"  <screen_height>240</screen_height>\n"
+			"  <game_width>400</game_width>\n"
+			"  <game_height>240</game_height>\n"
 			"  <game_position>center</game_position>\n"
+			"  <n3ds_layout>2</n3ds_layout>\n"
 			" </video>\n"
 			" <audio>\n"
 			"  <enabled>yes</enabled>\n"
