@@ -140,10 +140,12 @@ bool find_path( std::string path, std::string &dir_str )
       if( strlen(item->d_name) == dir_str.length() && strcasecmp( item->d_name, dir_str.c_str() ) == 0 )
       {
          dir_str = item->d_name;
+         closedir( dir );
          return true;
       }
    }
 
+   closedir( dir );
    return false;
 }
 

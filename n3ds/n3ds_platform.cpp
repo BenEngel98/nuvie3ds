@@ -17,6 +17,8 @@
 #include <3ds.h>
 #include <malloc.h>
 #include <sys/stat.h>
+#include <dirent.h>
+#include <string>
 #include <unistd.h>
 
 #include <algorithm>
@@ -311,6 +313,36 @@ Uint64 last_debug = 0;
 
 // ---------------------------------------------------------------------------
 
+// An earlier build wrote "./ultima6" style paths into nuvie.cfg.  The 3DS
+// file system does not resolve "./", so turn those into full paths.
+static void n3ds_fix_config_paths(const char* path) {
+	FILE* f = std::fopen(path, "rb");
+	if (f == nullptr) {
+		return;
+	}
+	std::string text;
+	char        buf[1024];
+	size_t      n;
+	while ((n = std::fread(buf, 1, sizeof(buf), f)) > 0) {
+		text.append(buf, n);
+	}
+	std::fclose(f);
+	bool        changed = false;
+	std::string::size_type pos;
+	while ((pos = text.find(">./")) != std::string::npos) {
+		text.replace(pos, 3, ">sdmc:/3ds/nuvie/");
+		changed = true;
+	}
+	if (changed) {
+		f = std::fopen(path, "wb");
+		if (f) {
+			std::fwrite(text.data(), 1, text.size(), f);
+			std::fclose(f);
+		}
+		std::printf("Nuvie 3DS: rewrote relative paths in nuvie.cfg\n");
+	}
+}
+
 void n3ds_platform_init() {
 	mkdir("sdmc:/3ds", 0777);
 	mkdir("sdmc:/3ds/nuvie", 0777);
@@ -320,6 +352,24 @@ void n3ds_platform_init() {
 	freopen("sdmc:/3ds/nuvie/nuvie_err.txt", "w", stderr);
 	setvbuf(stdout, nullptr, _IONBF, 0);
 	setvbuf(stderr, nullptr, _IONBF, 0);
+	n3ds_fix_config_paths("sdmc:/3ds/nuvie/nuvie.cfg");
+	{
+		// Say what the game folder looks like, so a bad copy is obvious in the log.
+		DIR* d     = opendir("sdmc:/3ds/nuvie/ultima6");
+		int  count = 0;
+		bool u6set = false;
+		if (d) {
+			while (struct dirent* e = readdir(d)) {
+				count++;
+				if (strcasecmp(e->d_name, "u6.set") == 0) {
+					u6set = true;
+				}
+			}
+			closedir(d);
+		}
+		std::printf("Nuvie 3DS: ultima6 folder %s, %d entries, U6.SET %s\n", d ? "found" : "MISSING", count,
+				u6set ? "found" : "missing");
+	}
 	bool is_new = n3ds_is_new_3ds();
 	std::printf("Nuvie 3DS: %s 3DS, heap %u KB, linear %u KB, stack %u KB\n", is_new ? "New" : "original",
 			__ctru_heap_size / 1024, __ctru_linear_heap_size / 1024, __stacksize__ / 1024);
@@ -447,10 +497,10 @@ bool n3ds_write_default_config(const char* path) {
 			" </audio>\n"
 			" <ultima6>\n"
 			"  <language>en</language>\n"
-			"  <gamedir>./ultima6</gamedir>\n"
-			"  <townsdir>./fmtowns_u6</townsdir>\n"
-			"  <sounddir>./u6_sounds</sounddir>\n"
-			"  <savedir>./u6_save</savedir>\n"
+			"  <gamedir>sdmc:/3ds/nuvie/ultima6</gamedir>\n"
+			"  <townsdir>sdmc:/3ds/nuvie/fmtowns_u6</townsdir>\n"
+			"  <sounddir>sdmc:/3ds/nuvie/u6_sounds</sounddir>\n"
+			"  <savedir>sdmc:/3ds/nuvie/u6_save</savedir>\n"
 			"  <skip_intro>no</skip_intro>\n"
 			"  <show_eggs>no</show_eggs>\n"
 			"  <roof_mode>no</roof_mode>\n"
@@ -464,23 +514,23 @@ bool n3ds_write_default_config(const char* path) {
 			"  <sfx>native</sfx>\n"
 			"  <enable_speech>yes</enable_speech>\n"
 			"  <game_specific_keys>(default)</game_specific_keys>\n"
-			"  <patch_keys>./patchkeys.txt</patch_keys>\n"
+			"  <patch_keys>sdmc:/3ds/nuvie/patchkeys.txt</patch_keys>\n"
 			" </ultima6>\n"
 			" <martian>\n"
 			"  <language>en</language>\n"
-			"  <gamedir>./martian</gamedir>\n"
-			"  <savedir>./martian_save</savedir>\n"
+			"  <gamedir>sdmc:/3ds/nuvie/martian</gamedir>\n"
+			"  <savedir>sdmc:/3ds/nuvie/martian_save</savedir>\n"
 			"  <skip_intro>no</skip_intro>\n"
 			"  <game_specific_keys>(default)</game_specific_keys>\n"
-			"  <patch_keys>./patchkeys.txt</patch_keys>\n"
+			"  <patch_keys>sdmc:/3ds/nuvie/patchkeys.txt</patch_keys>\n"
 			" </martian>\n"
 			" <savage>\n"
 			"  <language>en</language>\n"
-			"  <gamedir>./savage</gamedir>\n"
-			"  <savedir>./savage_save</savedir>\n"
+			"  <gamedir>sdmc:/3ds/nuvie/savage</gamedir>\n"
+			"  <savedir>sdmc:/3ds/nuvie/savage_save</savedir>\n"
 			"  <skip_intro>no</skip_intro>\n"
 			"  <game_specific_keys>(default)</game_specific_keys>\n"
-			"  <patch_keys>./patchkeys.txt</patch_keys>\n"
+			"  <patch_keys>sdmc:/3ds/nuvie/patchkeys.txt</patch_keys>\n"
 			" </savage>\n"
 			"</config>\n",
 			f);
