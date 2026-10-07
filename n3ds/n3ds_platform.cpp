@@ -23,10 +23,15 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <cerrno>
 
 #include "nuvieDefs.h"
 #undef clamp    // nuvieDefs.h macro vs std::clamp
 #include "Screen.h"
+#include "Game.h"
+#include "ViewManager.h"
+#include "TileManager.h"
+#include "InventoryView.h"
 
 /*
  *  Controls
@@ -182,8 +187,14 @@ SDL_Keycode button_key(SDL_GamepadButton b) {
 		return SDLK_RETURN;
 	case SDL_GAMEPAD_BUTTON_SOUTH:    // B (bottom)
 		return SDLK_SPACE;
-	case SDL_GAMEPAD_BUTTON_NORTH:    // X (top)
-		return SDLK_I;
+	case SDL_GAMEPAD_BUTTON_NORTH: {    // X (top): the Avatar's inventory, or back to the party list
+		Game*        game = Game::get_game();
+		ViewManager* vm   = game ? game->get_view_manager() : nullptr;
+		if (vm && vm->get_current_view() == static_cast<View*>(vm->get_inventory_view())) {
+			return SDLK_SLASH;    // party_view
+		}
+		return SDLK_F1;    // inventory 1
+	}
 	case SDL_GAMEPAD_BUTTON_WEST:    // Y (left)
 		return SDLK_L;
 	case SDL_GAMEPAD_BUTTON_START:

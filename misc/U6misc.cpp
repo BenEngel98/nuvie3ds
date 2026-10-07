@@ -109,7 +109,6 @@ bool find_casesensitive_path( std::string path, std::string filename, std::strin
    {
       string dir = *dir_iter;
 
-      printf( "%s, ", dir.c_str() );
 
       if( find_path( tmp_path, dir ) == false )
          return false;
@@ -124,7 +123,6 @@ bool find_casesensitive_path( std::string path, std::string filename, std::strin
 
    new_path = tmp_path;
 
-   printf( "\nproper path = %s\n", new_path.c_str() );
    return true;
 }
 
@@ -139,7 +137,6 @@ bool find_path( std::string path, std::string &dir_str )
 
    for( item = readdir( dir ); item != NULL; item = readdir( dir ) )
    {
-      printf( "trying %s, want %s\n", item->d_name, dir_str.c_str() );
       if( strlen(item->d_name) == dir_str.length() && strcasecmp( item->d_name, dir_str.c_str() ) == 0 )
       {
          dir_str = item->d_name;
@@ -182,7 +179,6 @@ int mkdir_recursive(std::string path, int mode)
    {
       string dir = *dir_iter;
       
-      printf( "%s, ", dir.c_str() );
       
       tmp_path += dir;
       tmp_path += U6PATH_DELIMITER;

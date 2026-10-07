@@ -29,6 +29,9 @@
 #include <cstdlib>
 
 #include "SDL.h"
+#ifdef __3DS__
+#include <SDL3/SDL_main.h>    // SDL's wrapper mounts romfs and enables the New 3DS clock speed
+#endif
 
 #include "nuvieDefs.h"
 #include "Console.h"
