@@ -343,6 +343,77 @@ static void n3ds_fix_config_paths(const char* path) {
 	}
 }
 
+// Does this folder hold the Ultima VI files?  (U6.SET is one of them.)
+static int n3ds_count_game_files(const char* dir, bool* has_u6set) {
+	DIR* d     = opendir(dir);
+	int  count = 0;
+	*has_u6set = false;
+	if (d == nullptr) {
+		return -1;
+	}
+	while (struct dirent* e = readdir(d)) {
+		count++;
+		if (strcasecmp(e->d_name, "u6.set") == 0) {
+			*has_u6set = true;
+		}
+	}
+	closedir(d);
+	return count;
+}
+
+// People drop the whole GOG download into /3ds/nuvie/ultima6.  If the game
+// files are not at the top but in the Mac app's Contents/Resources/game (or
+// a "game" subfolder), point the config there instead.
+static void n3ds_find_game_folder() {
+	static const char* candidates[] = {
+			"sdmc:/3ds/nuvie/ultima6",
+			"sdmc:/3ds/nuvie/ultima6/Contents/Resources/game",
+			"sdmc:/3ds/nuvie/ultima6/game",
+			"sdmc:/3ds/nuvie/ultima6/ultima6",
+	};
+	const char* found = nullptr;
+	for (const char* c : candidates) {
+		bool      u6set = false;
+		const int n     = n3ds_count_game_files(c, &u6set);
+		std::printf("Nuvie 3DS: %s: %s\n", c, n < 0 ? "not there" : (u6set ? "has the game files" : "no U6.SET here"));
+		if (n >= 0 && u6set && found == nullptr) {
+			found = c;
+		}
+	}
+	if (found == nullptr || std::strcmp(found, candidates[0]) == 0) {
+		return;
+	}
+	// Rewrite the gamedir line in nuvie.cfg.
+	const char* cfg = "sdmc:/3ds/nuvie/nuvie.cfg";
+	FILE*       f   = std::fopen(cfg, "rb");
+	if (f == nullptr) {
+		return;
+	}
+	std::string text;
+	char        buf[1024];
+	size_t      n;
+	while ((n = std::fread(buf, 1, sizeof(buf), f)) > 0) {
+		text.append(buf, n);
+	}
+	std::fclose(f);
+	const std::string::size_type a = text.find("<gamedir>");
+	const std::string::size_type b = (a == std::string::npos) ? a : text.find("</gamedir>", a);
+	if (b == std::string::npos) {
+		return;
+	}
+	const std::string current = text.substr(a + 9, b - (a + 9));
+	if (current == found) {
+		return;
+	}
+	text.replace(a + 9, b - (a + 9), found);
+	f = std::fopen(cfg, "wb");
+	if (f) {
+		std::fwrite(text.data(), 1, text.size(), f);
+		std::fclose(f);
+	}
+	std::printf("Nuvie 3DS: game folder set to %s\n", found);
+}
+
 void n3ds_platform_init() {
 	mkdir("sdmc:/3ds", 0777);
 	mkdir("sdmc:/3ds/nuvie", 0777);
@@ -353,23 +424,7 @@ void n3ds_platform_init() {
 	setvbuf(stdout, nullptr, _IONBF, 0);
 	setvbuf(stderr, nullptr, _IONBF, 0);
 	n3ds_fix_config_paths("sdmc:/3ds/nuvie/nuvie.cfg");
-	{
-		// Say what the game folder looks like, so a bad copy is obvious in the log.
-		DIR* d     = opendir("sdmc:/3ds/nuvie/ultima6");
-		int  count = 0;
-		bool u6set = false;
-		if (d) {
-			while (struct dirent* e = readdir(d)) {
-				count++;
-				if (strcasecmp(e->d_name, "u6.set") == 0) {
-					u6set = true;
-				}
-			}
-			closedir(d);
-		}
-		std::printf("Nuvie 3DS: ultima6 folder %s, %d entries, U6.SET %s\n", d ? "found" : "MISSING", count,
-				u6set ? "found" : "missing");
-	}
+	n3ds_find_game_folder();
 	bool is_new = n3ds_is_new_3ds();
 	std::printf("Nuvie 3DS: %s 3DS, heap %u KB, linear %u KB, stack %u KB\n", is_new ? "New" : "original",
 			__ctru_heap_size / 1024, __ctru_linear_heap_size / 1024, __stacksize__ / 1024);
