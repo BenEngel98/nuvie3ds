@@ -155,7 +155,6 @@ config->value("config/video/scale_factor", scale_factor, 1);
 
 #ifdef __3DS__
     n3ds_input_start(sdlWindow);
-    n3ds_set_mirror_surface(sdl_surface);
 #elif SDL_VERSION_ATLEAST(2, 0, 0)
     SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 255);
     SDL_RenderClear(sdlRenderer);
@@ -1619,6 +1618,7 @@ bool Screen::create_sdl_surface_and_texture(sint32 w, sint32 h, Uint32 format)
     }
 #ifdef __3DS__
     sdlTexture = NULL;
+    n3ds_set_mirror_surface(sdl_surface);
     return true;
 #endif
 
